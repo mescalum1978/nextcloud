@@ -1,5 +1,5 @@
 # Start Containers
-docker compose -f docker-compose.nextcloud-minio-primary.yml up -d
+docker compose up -d
 
 # Add the S3 object store config (MinIO) to config/config.php
 docker exec -u www-data -it nextcloud-app bash -lc '\
