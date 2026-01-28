@@ -1,0 +1,89 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: nextcloud-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: nextcloud
+      POSTGRES_USER: nextcloud
+      POSTGRES_PASSWORD: change_this_strong_password
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  redis:
+    image: redis:7-alpine
+    container_name: nextcloud-redis
+    restart: unless-stopped
+    # Enable persistence and require a password (match REDIS_HOST_PASSWORD below)
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "change_this_redis_password"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a change_this_redis_password ping | grep PONG || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  nextcloud:
+    image: nextcloud:latest
+    container_name: nextcloud-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # NPM will forward HTTPS → HTTP:8080 → container port 80
+    ports:
+      - "8080:80"
+    environment:
+      # Database
+      POSTGRES_HOST: db
+      POSTGRES_DB: nextcloud
+      POSTGRES_USER: nextcloud
+      POSTGRES_PASSWORD: change_this_strong_password
+
+      # Bootstrap admin (used only on first run)
+      NEXTCLOUD_ADMIN_USER: admin
+      NEXTCLOUD_ADMIN_PASSWORD: change_this_admin_password
+
+      # Domain & reverse proxy
+      NEXTCLOUD_TRUSTED_DOMAINS: nextcloud.azurewrath.nl localhost 127.0.0.1
+      OVERWRITEPROTOCOL: https
+      OVERWRITEHOST: nextcloud.azurewrath.nl
+      TRUSTED_PROXIES: 192.168.1.0/24
+
+      # Redis for locking & caching
+      REDIS_HOST: redis
+      REDIS_HOST_PORT: 6379
+      REDIS_HOST_PASSWORD: change_this_redis_password
+
+      # Optional PHP tunables for your 8GB VM (uncomment & adjust as needed)
+      # PHP_MEMORY_LIMIT: 1024M
+      # PHP_UPLOAD_LIMIT: 2048M
+
+    volumes:
+      - nextcloud_data:/var/www/html
+
+# Optional (recommended in production): dedicated cron runner for background jobs
+#  nextcloud-cron:
+#    image: nextcloud:latest
+#    container_name: nextcloud-cron
+#    restart: unless-stopped
+#    depends_on:
+#      - nextcloud
+#    volumes:
+#      - nextcloud_data:/var/www/html
+#    entrypoint: /cron.sh
+
+volumes:
+  db_data:
+  redis_data:
+  nextcloud_data:
