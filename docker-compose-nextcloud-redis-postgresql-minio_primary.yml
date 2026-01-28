@@ -85,6 +85,21 @@ services:
     volumes:
       # Mount the entire webroot so /var/www/html/config persists
       - nextcloud_html:/var/www/html
+      
+  nextcloud-cron:
+      image: nextcloud:latest
+      container_name: nextcloud-cron
+      restart: unless-stopped
+      depends_on:
+        nextcloud:
+          condition: service_started
+      volumes:
+      # MUST match your main Nextcloud volume so cron can see the instance
+      # For "primary" file, you used:
+      - nextcloud_html:/var/www/html
+      # For "external" file, you used:
+      # - nextcloud_data:/var/www/html
+      entrypoint: /cron.sh
 
 volumes:
   db_data:
